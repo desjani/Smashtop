@@ -183,29 +183,25 @@ class EmojiParticle(Particle):
         curr_size = int(self.size * self.scale)
         if curr_size <= 1: return
         
-        # Performance: Scale only if size changed significantly? 
-        # For now, 1200 # Faster launch for higher res screens
+        scaled = pygame.transform.scale(self.image, (curr_size, curr_size))
+        rect = scaled.get_rect(center=(self.x, self.y))
+        surface.blit(scaled, rect)
+
+class FireworkParticle(Particle):
+    def __init__(self, x, target_y, game_ref):
+        super().__init__(x, game_ref.height, random_color())
+        self.target_y = target_y
+        self.game = game_ref
+        self.vy = -1200 # Faster launch
         self.state = "launch"
 
     def update(self, dt):
         if self.state == "launch":
             self.y += self.vy * dt
-            # Only apply drag if we are getting close? 
-            # Or just use constant physics. 
             self.vy *= 0.99  # Less drag
             
             # Explode if reached target OR if we slowed down too much
-            if self.y <= self.target_y or self.vy > -10
-        self.game = game_ref
-        self.vy = -800 # Pixels per second
-        self.state = "launch"
-
-    def update(self, dt):
-        if self.state == "launch":
-            self.y += self.vy * dt
-            self.vy *= 0.98 # Drag
-            
-            if self.y <= self.target_y or self.vy > -50:
+            if self.y <= self.target_y or self.vy > -100:
                 self.explode()
         elif self.state == "out":
             self.alive = False
@@ -224,9 +220,9 @@ class EmojiParticle(Particle):
             pygame.draw.line(surface, self.color, (self.x, self.y), (self.x, self.y + 20), 4)
 
 class ExplosionParticle(Particle):
-    def 
-        # Sea Creature Mode? No, this is firework.
-        # But we'll add Sea classes below here.
+    def __init__(self, x, y, color):
+        super().__init__(x, y, color)
+        angle = random.uniform(0, 2 * math.pi)
         
         speed = random.uniform(100, 400)
         self.vx = math.cos(angle) * speed
@@ -247,7 +243,6 @@ class ExplosionParticle(Particle):
 
     def draw(self, surface):
         alpha = int((self.life / 2.0) * 255)
-        if alpha < 0: alpha = 0
         if alpha > 10:
            pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), 3)
 
@@ -341,10 +336,6 @@ class JellyfishParticle(Particle):
             start = (self.x + off, self.y)
             end_y = self.y + h + (math.sin(self.pulse_phase + i)*10)
             pygame.draw.line(surface, self.color, start, (self.x + off + math.sin(self.pulse_phase)*5, end_y), 2)
-
-        # We'll just draw small circles
-        if alpha > 10:
-           pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), 3)
 
 class FontManager:
     def __init__(self):
