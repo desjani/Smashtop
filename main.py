@@ -130,12 +130,22 @@ class TextParticle(Particle):
         self.char = char
         self.font_manager = font_manager
         self.size = random.randint(100, 250)
-        self.spin_speed = random.choice([-20, 20])
+        self.spin_speed = random.choice([-100, -50, 50, 100])
         self.angle = 0
+        self.angle_target = 0
 
     def update(self, dt):
         super().update(dt)
-        self.angle += self.spin_speed * dt
+        # While growing, spin fast
+        if self.state == "in":
+            self.angle += self.spin_speed * dt
+        # Once active, settle to 0
+        elif self.state == "active":
+            # Simple lerp to 0
+            if abs(self.angle) > 1:
+                self.angle *= 0.90 # Decay angle
+            else:
+                self.angle = 0
 
     def draw(self, surface):
         s = self.size * self.scale
@@ -174,15 +184,18 @@ class EmojiParticle(Particle):
         if curr_size <= 1: return
         
         # Performance: Scale only if size changed significantly? 
-        # For now, just scale every frame (pygame is fast enough for <50 objects)
-        scaled = pygame.transform.scale(self.image, (curr_size, curr_size))
-        rect = scaled.get_rect(center=(self.x, self.y))
-        surface.blit(scaled, rect)
+        # For now, 1200 # Faster launch for higher res screens
+        self.state = "launch"
 
-class FireworkParticle(Particle):
-    def __init__(self, x, target_y, game_ref):
-        super().__init__(x, game_ref.height, random_color())
-        self.target_y = target_y
+    def update(self, dt):
+        if self.state == "launch":
+            self.y += self.vy * dt
+            # Only apply drag if we are getting close? 
+            # Or just use constant physics. 
+            self.vy *= 0.99  # Less drag
+            
+            # Explode if reached target OR if we slowed down too much
+            if self.y <= self.target_y or self.vy > -10
         self.game = game_ref
         self.vy = -800 # Pixels per second
         self.state = "launch"
@@ -211,9 +224,10 @@ class FireworkParticle(Particle):
             pygame.draw.line(surface, self.color, (self.x, self.y), (self.x, self.y + 20), 4)
 
 class ExplosionParticle(Particle):
-    def __init__(self, x, y, color):
-        super().__init__(x, y, color)
-        angle = random.uniform(0, 2 * math.pi)
+    def 
+        # Sea Creature Mode? No, this is firework.
+        # But we'll add Sea classes below here.
+        
         speed = random.uniform(100, 400)
         self.vx = math.cos(angle) * speed
         self.vy = math.sin(angle) * speed
@@ -234,7 +248,100 @@ class ExplosionParticle(Particle):
     def draw(self, surface):
         alpha = int((self.life / 2.0) * 255)
         if alpha < 0: alpha = 0
-        # Pygame doesn't do alpha on primitives easily without a surface
+        if alpha > 10:
+           pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), 3)
+
+# --- Sea Theme Classes ---
+
+class BubbleParticle(Particle):
+    def __init__(self, x, y):
+        super().__init__(x, y, (200, 200, 255))
+        self.vy = random.uniform(-100, -250)
+        self.wobble_phase = random.uniform(0, 100)
+        self.size = random.randint(20, 60)
+        
+    def update(self, dt):
+        super().update(dt)
+        self.y += self.vy * dt
+        self.wobble_phase += 5 * dt
+        self.x += math.sin(self.wobble_phase) * 100 * dt
+        
+        if self.y < -50: self.alive = False
+
+    def draw(self, surface):
+        s = int(self.size * self.scale)
+        if s > 2:
+            pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), int(s/2), 2)
+            # Shine
+            pygame.draw.circle(surface, (255,255,255), (int(self.x - s/6), int(self.y - s/6)), int(s/8))
+
+class FishParticle(Particle):
+    def __init__(self, x, y, color):
+        super().__init__(x, y, color)
+        self.vx = random.choice([-200, -150, 150, 200])
+        self.direction = 1 if self.vx > 0 else -1
+        self.size = random.randint(60, 120)
+
+    def update(self, dt):
+        super().update(dt)
+        self.x += self.vx * dt
+        screen_w = pygame.display.get_surface().get_width()
+        if (self.vx > 0 and self.x > screen_w + 100) or (self.vx < 0 and self.x < -100):
+            self.alive = False
+
+    def draw(self, surface):
+        s = self.size * self.scale
+        d = self.direction
+        x, y = self.x, self.y
+        
+        # Simple Fish Polygon
+        # Body
+        body_pts = [
+            (x + 30*d*self.scale, y),
+            (x - 30*d*self.scale, y - 20*self.scale),
+            (x - 30*d*self.scale, y + 20*self.scale)
+        ]
+        # Tail
+        tail_pts = [
+            (x - 30*d*self.scale, y),
+            (x - 50*d*self.scale, y - 25*self.scale),
+            (x - 50*d*self.scale, y + 25*self.scale)
+        ]
+        
+        pygame.draw.polygon(surface, self.color, body_pts)
+        pygame.draw.polygon(surface, self.color, tail_pts)
+        pygame.draw.circle(surface, (255,255,255), (int(x + 15*d*self.scale), int(y - 5*self.scale)), int(4*self.scale))
+
+class JellyfishParticle(Particle):
+    def __init__(self, x, y, color):
+        super().__init__(x, y, color)
+        self.vy = random.uniform(-30, -80)
+        self.size = random.randint(80, 150)
+        self.pulse_phase = random.uniform(0, 10)
+        
+    def update(self, dt):
+        super().update(dt)
+        self.y += self.vy * dt
+        self.pulse_phase += 5 * dt
+        if self.y < -150: self.alive = False
+
+    def draw(self, surface):
+        s = self.size * self.scale
+        pulse = 1.0 + 0.1 * math.sin(self.pulse_phase)
+        w = int(s * pulse)
+        h = int(s * 0.8 * pulse)
+        
+        rect = pygame.Rect(self.x - w/2, self.y - h/2, w, h)
+        pygame.draw.arc(surface, self.color, rect, 0, math.pi, 5)
+        pygame.draw.line(surface, self.color, (self.x - w/2, self.y), (self.x + w/2, self.y), 2)
+        
+        # Tentacles
+        for i in range(3):
+            off = (i - 1) * (w/4)
+            start = (self.x + off, self.y)
+            end_y = self.y + h + (math.sin(self.pulse_phase + i)*10)
+            pygame.draw.line(surface, self.color, start, (self.x + off + math.sin(self.pulse_phase)*5, end_y), 2)
+
         # We'll just draw small circles
         if alpha > 10:
            pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), 3)
@@ -445,6 +552,7 @@ class SmashtopGame:
         if event.key == pygame.K_1: self.theme = "Shapes"
         elif event.key == pygame.K_2: self.theme = "Fireworks"
         elif event.key == pygame.K_3: self.theme = "Emoji"
+        elif event.key == pygame.K_4: self.theme = "Sea"
         
         elif event.key == pygame.K_c: 
             # Cycle colors
@@ -467,16 +575,36 @@ class SmashtopGame:
         
         if self.theme == "Fireworks":
             self.particles.append(FireworkParticle(x, y, self))
+        elif self.theme == "Sea":
+             # Randomly choose
+             choice = random.choice(['bubble', 'fish', 'jellyfish'])
+             if choice == 'bubble':
+                 self.particles.append(BubbleParticle(x, self.height + 50))
+             elif choice == 'fish':
+                 # Fish spawn sides
+                 spawn_x = -50 if random.random() > 0.5 else self.width + 50
+                 self.particles.append(FishParticle(spawn_x, y, random_color()))
+             elif choice == 'jellyfish':
+                 self.particles.append(JellyfishParticle(x, self.height + 50, random_color()))
+
         elif self.theme == "Emoji":
             try:
                 char = event.unicode
-                # If char is not printable or empty, pick random emoji
-                emojis = ['😀', '🐶', '🐱', '🍎', '⚽', '🚗', '🌈']
+                # Expanded Emoji List
+                emojis = [
+                    '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇',
+                    '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷',
+                    '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🍍',
+                    '🚗', '🚕', '🚙', '🚌', '🚎', '🏎', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜',
+                    '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸', '🥅', '🏒',
+                    '🌈', '☀️', '⭐', '🌟', '🌙', '☁️', '❄️', '🔥', '🎈', '🎁', '🎂', '🎨', '🎺',
+                    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞'
+                ]
                 if not char or not char.strip():
                    char = random.choice(emojis)
-                # But typically we want big emojis even for letters? 
-                # Let's just pick random emojis for now if in emoji mode
-                char = random.choice(emojis)
+                # Just pick random emojis 80% of time for fun
+                if random.random() > 0.2:
+                    char = random.choice(emojis)
                 self.particles.append(EmojiParticle(x, y, char, self.emoji_renderer))
             except: pass
         else: # Shapes
@@ -512,6 +640,7 @@ class SmashtopGame:
                 f"[1] Theme: Shapes {'(Active)' if self.theme == 'Shapes' else ''}",
                 f"[2] Theme: Fireworks {'(Active)' if self.theme == 'Fireworks' else ''}",
                 f"[3] Theme: Emoji {'(Active)' if self.theme == 'Emoji' else ''}",
+                f"[4] Theme: Sea {'(Active)' if self.theme == 'Sea' else ''}",
                 "",
                 f"[C] Background: {self.bg_name}",
                 "",
