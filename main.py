@@ -253,7 +253,7 @@ class BubbleParticle(Particle):
         super().__init__(x, y, (200, 200, 255))
         self.vy = random.uniform(-100, -250)
         self.wobble_phase = random.uniform(0, 100)
-        self.size = random.randint(20, 60)
+        self.size = random.randint(10, 80) # More varied size (was 20-60)
         
     def update(self, dt):
         super().update(dt)
@@ -275,7 +275,7 @@ class FishParticle(Particle):
         super().__init__(x, y, color)
         self.vx = random.choice([-200, -150, 150, 200])
         self.direction = 1 if self.vx > 0 else -1
-        self.size = random.randint(60, 120)
+        self.size = random.randint(40, 140) # Varied (was 60-120)
 
     def update(self, dt):
         super().update(dt)
@@ -310,8 +310,8 @@ class FishParticle(Particle):
 class JellyfishParticle(Particle):
     def __init__(self, x, y, color):
         super().__init__(x, y, color)
-        self.vy = random.uniform(-30, -80)
-        self.size = random.randint(80, 150)
+        self.vy = random.uniform(-60, -120) # Increased speed (was -30 to -80)
+        self.size = random.randint(50, 200) # Varied size (was 80-150)
         self.pulse_phase = random.uniform(0, 10)
         
     def update(self, dt):
@@ -336,6 +336,120 @@ class JellyfishParticle(Particle):
             start = (self.x + off, self.y)
             end_y = self.y + h + (math.sin(self.pulse_phase + i)*10)
             pygame.draw.line(surface, self.color, start, (self.x + off + math.sin(self.pulse_phase)*5, end_y), 2)
+
+class SharkParticle(Particle):
+    def __init__(self, x, y):
+        super().__init__(x, y, (100, 100, 100)) # Dark Gray
+        self.vx = random.choice([-300, -250, 250, 300]) # Fast
+        self.direction = 1 if self.vx > 0 else -1
+        self.size = random.randint(150, 250)
+
+    def update(self, dt):
+        super().update(dt)
+        self.x += self.vx * dt
+        screen_w = pygame.display.get_surface().get_width()
+        if (self.vx > 0 and self.x > screen_w + 200) or (self.vx < 0 and self.x < -200):
+            self.alive = False
+
+    def draw(self, surface):
+        x, y = self.x, self.y
+        d = self.direction
+        s = self.scale
+        
+        # Shark Shape
+        # Main Body (Oval-ish polygon)
+        pts = [
+            (x + 80*d*s, y),       # Nose
+            (x + 20*d*s, y - 30*s), # Top head
+            (x - 20*d*s, y - 40*s), # Dorsal start
+            (x - 40*d*s, y - 70*s), # Dorsal fin top
+            (x - 60*d*s, y - 30*s), # Dorsal end
+            (x - 100*d*s, y),       # Tail base
+            (x - 140*d*s, y - 40*s), # Top tail
+            (x - 140*d*s, y + 40*s), # Bot tail
+            (x - 100*d*s, y + 10*s), # Tail base bot
+            (x - 20*d*s, y + 30*s),  # Belly
+            (x + 40*d*s, y + 20*s),  # Chin
+        ]
+        pygame.draw.polygon(surface, self.color, pts)
+        # Eye
+        pygame.draw.circle(surface, (255,255,255), (int(x + 50*d*s), int(y - 10*s)), int(5*s))
+
+class WhaleParticle(Particle):
+    def __init__(self, x, y):
+        super().__init__(x, y, (50, 60, 100)) # Dark Blue
+        self.vx = random.choice([-100, -80, 80, 100]) # Slow
+        self.direction = 1 if self.vx > 0 else -1
+        self.size = random.randint(250, 400) # Big
+
+    def update(self, dt):
+        super().update(dt)
+        self.x += self.vx * dt
+        screen_w = pygame.display.get_surface().get_width()
+        if (self.vx > 0 and self.x > screen_w + 300) or (self.vx < 0 and self.x < -300):
+            self.alive = False
+
+    def draw(self, surface):
+        x, y = self.x, self.y
+        d = self.direction
+        s = self.scale
+        
+        # Simple Whale Shape
+        pts = [
+            (x + 100*d*s, y + 20*s),   # Nose
+            (x + 40*d*s, y - 60*s),    # Head top
+            (x - 60*d*s, y - 60*s),    # Back
+            (x - 120*d*s, y - 10*s),   # Tail base
+            (x - 180*d*s, y - 40*s),   # Tail fin top
+            (x - 180*d*s, y + 40*s),   # Tail fin bot
+            (x - 120*d*s, y + 30*s),   # Belly tail
+            (x + 20*d*s, y + 60*s),    # Belly
+        ]
+        pygame.draw.polygon(surface, self.color, pts)
+        # Eye
+        pygame.draw.circle(surface, (255,255,255), (int(x + 60*d*s), int(y - 10*s)), int(4*s))
+
+class DolphinParticle(Particle):
+    def __init__(self, x, y):
+        super().__init__(x, y, (150, 150, 200)) # Light Blue/Gray
+        self.vx = random.choice([-200, -180, 180, 200])
+        self.direction = 1 if self.vx > 0 else -1
+        self.size = random.randint(120, 180)
+        self.y_start = y
+        self.time = 0
+
+    def update(self, dt):
+        super().update(dt)
+        self.time += dt
+        self.x += self.vx * dt
+        # Swim motion (sine wave)
+        self.y = self.y_start + math.sin(self.time * 3) * 50
+        
+        screen_w = pygame.display.get_surface().get_width()
+        if (self.vx > 0 and self.x > screen_w + 200) or (self.vx < 0 and self.x < -200):
+            self.alive = False
+
+    def draw(self, surface):
+        x, y = self.x, self.y
+        d = self.direction
+        s = self.scale
+        
+        # Dolphin Shape
+        pts = [
+            (x + 60*d*s, y),       # Beak
+            (x + 30*d*s, y - 20*s), # Forehead
+            (x + 0*d*s, y - 25*s),  # Head top
+            (x - 20*d*s, y - 40*s), # Dorsal fin top
+            (x - 40*d*s, y - 25*s), # Mid back
+            (x - 90*d*s, y - 5*s),  # Tail base
+            (x - 120*d*s, y - 20*s), # Tail top
+            (x - 120*d*s, y + 20*s), # Tail bot
+            (x - 60*d*s, y + 15*s),  # Belly back
+            (x + 0*d*s, y + 15*s),   # Belly
+            (x + 40*d*s, y + 5*s),   # Throat
+        ]
+        pygame.draw.polygon(surface, self.color, pts)
+        pygame.draw.circle(surface, (255,255,255), (int(x + 35*d*s), int(y - 5*s)), int(3*s))
 
 class FontManager:
     def __init__(self):
@@ -539,20 +653,33 @@ class SmashtopGame:
                     self.spawn_object(event)
 
     def handle_settings_input(self, event):
+        changed = False
         # Very simple settings navigation
-        if event.key == pygame.K_1: self.theme = "Shapes"
-        elif event.key == pygame.K_2: self.theme = "Fireworks"
-        elif event.key == pygame.K_3: self.theme = "Emoji"
-        elif event.key == pygame.K_4: self.theme = "Sea"
+        if event.key == pygame.K_1 and self.theme != "Shapes": 
+            self.theme = "Shapes"
+            changed = True
+        elif event.key == pygame.K_2 and self.theme != "Fireworks": 
+            self.theme = "Fireworks"
+            changed = True
+        elif event.key == pygame.K_3 and self.theme != "Emoji": 
+            self.theme = "Emoji"
+            changed = True
+        elif event.key == pygame.K_4 and self.theme != "Sea": 
+            self.theme = "Sea"
+            changed = True
         
         elif event.key == pygame.K_c: 
             # Cycle colors
             keys = list(BACKGROUND_COLORS.keys())
             idx = keys.index(self.bg_name)
             self.bg_name = keys[(idx + 1) % len(keys)]
+            changed = True
         
         elif event.key == pygame.K_ESCAPE:
             self.show_settings = False
+
+        if changed:
+            self.particles.clear()
 
     def spawn_object(self, event):
         self.play_sound()
@@ -567,16 +694,42 @@ class SmashtopGame:
         if self.theme == "Fireworks":
             self.particles.append(FireworkParticle(x, y, self))
         elif self.theme == "Sea":
-             # Randomly choose
-             choice = random.choice(['bubble', 'fish', 'jellyfish'])
-             if choice == 'bubble':
+             # New logic: Ensure even proportion of species
+             # Species list: Bubble, Fish, Jellyfish, Shark, Whale, Dolphin
+             species = ['baby', 'fish', 'jelly', 'shark', 'whale', 'dolphin']
+             
+             # Check current population (simple count)
+             # This is a bit expensive O(N) every keypress but N is small (<50)
+             counts = {k:0 for k in species}
+             for p in self.particles:
+                 if isinstance(p, BubbleParticle): counts['baby'] += 1
+                 elif isinstance(p, FishParticle): counts['fish'] += 1
+                 elif isinstance(p, JellyfishParticle): counts['jelly'] += 1
+                 elif isinstance(p, SharkParticle): counts['shark'] += 1
+                 elif isinstance(p, WhaleParticle): counts['whale'] += 1
+                 elif isinstance(p, DolphinParticle): counts['dolphin'] += 1
+            
+             # Find least represented
+             min_count = min(counts.values())
+             candidates = [k for k, v in counts.items() if v <= min_count]
+             choice = random.choice(candidates)
+
+             if choice == 'baby':
                  self.particles.append(BubbleParticle(x, self.height + 50))
              elif choice == 'fish':
-                 # Fish spawn sides
                  spawn_x = -50 if random.random() > 0.5 else self.width + 50
                  self.particles.append(FishParticle(spawn_x, y, random_color()))
-             elif choice == 'jellyfish':
+             elif choice == 'jelly':
                  self.particles.append(JellyfishParticle(x, self.height + 50, random_color()))
+             elif choice == 'shark':
+                 spawn_x = -200 if random.random() > 0.5 else self.width + 200
+                 self.particles.append(SharkParticle(spawn_x, y))
+             elif choice == 'whale':
+                 spawn_x = -300 if random.random() > 0.5 else self.width + 300
+                 self.particles.append(WhaleParticle(spawn_x, y)) 
+             elif choice == 'dolphin':
+                 spawn_x = -200 if random.random() > 0.5 else self.width + 200
+                 self.particles.append(DolphinParticle(spawn_x, y))  
 
         elif self.theme == "Emoji":
             try:
