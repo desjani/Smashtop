@@ -693,8 +693,8 @@ class SmashtopGame:
         x = random.randint(100, self.width - 100)
         y = random.randint(100, self.height - 100)
         
-        # Limit objects
-        if len(self.particles) > self.max_objects:
+        # Limit objects (Only for persistent modes like Shapes and Emoji)
+        if self.theme in ["Shapes", "Emoji"] and len(self.particles) > self.max_objects:
             # Kill oldest
             self.particles[0].kill()
         
@@ -794,7 +794,7 @@ class SmashtopGame:
                 f"[4] Theme: Sea {'(Active)' if self.theme == 'Sea' else ''}",
                 "",
                 f"[C] Background: {self.bg_name}",
-                f"[Up/Down] Max Objects: {self.max_objects}",
+                f"[Up/Down] Max Objects (Shapes/Emoji): {self.max_objects}",
                 "",
                 "[Esc] Close Menu",
                 "[Ctrl+Shift+Q] Quit Game"
