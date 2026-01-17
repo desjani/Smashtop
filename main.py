@@ -4,6 +4,8 @@ import sys
 import math
 import platform
 import threading
+import array
+import struct
 from typing import List, Tuple, Dict, Optional
 
 # Optional imports for system locking
@@ -300,11 +302,63 @@ class EmojiRenderer:
             f = pygame.font.SysFont("arial", int(size/2))
             return f.render(char, True, (255,255,255))
 
+class SoundGenerator:
+    def __init__(self):
+        self.sounds = []
+        try:
+            pygame.mixer.set_num_channels(16) # Allow many overlapping sounds
+            self.generate_scale()
+        except Exception as e:
+            print(f"Sound init failed: {e}")
+
+    def generate_scale(self):
+        # Generate C major scale notes roughly
+        # Frequencies: C4...C6
+        notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
+        rate = 44100
+        duration = 0.15 # seconds
+        
+        for freq in notes:
+            # Generate one cycle of square wave
+            # period = rate / freq
+            # But plain array approach is easier filling the whole buffer
+            
+            n_samples = int(rate * duration)
+            buf = array.array('h', [0] * n_samples)
+            
+            # Simple square wave
+            period_samples = int(rate / freq)
+            for i in range(n_samples):
+                # value: max volume (32767) or min (-32768)
+                # Square wave: high for half period, low for half
+                if (i % period_samples) < (period_samples // 2):
+                    value = 10000 
+                else:
+                    value = -10000
+                
+                # Apply simple decay envelope to avoid clicking
+                decay = 1.0 - (i / n_samples)
+                buf[i] = int(value * decay)
+                
+            self.sounds.append(pygame.mixer.Sound(buffer=buf))
+
+    def play_random(self):
+        if not self.sounds: return
+        try:
+            s = random.choice(self.sounds)
+            s.set_volume(0.3)
+            s.play()
+        except: pass
+
 class SmashtopGame:
     def __init__(self):
         pygame.init()
-        pygame.mixer.init()
-        
+        # Init mixer with specific settings for low latency
+        try:
+            pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
+        except:
+            pygame.mixer.init()
+
         # Display setup
         info = pygame.display.Info()
         self.width = info.current_w
@@ -326,6 +380,7 @@ class SmashtopGame:
         self.particles = []
         self.font_manager = FontManager()
         self.emoji_renderer = EmojiRenderer()
+        self.sound_generator = SoundGenerator()
         
         # Lockout state
         self.locked = True
@@ -356,14 +411,10 @@ class SmashtopGame:
 
     def play_sound(self):
         if not self.sound_enabled: return
-        # Generate simple sound? Pygame mixer uses Sound objects.
-        # Generating sound buffers in code is possible but complex.
-        # We'll rely on a simple synthesizer approach using numpy if available or just skip for now 
-        # to focus on visual perf.
-        # Simplest: Just reuse winsound if on windows for "beep" since it's easy, 
-        # but that blocks? No, winsound.Beep blocks. winsound.MessageBeep is async but limited.
-        # Better: Create a few standard beep Sound objects using array.
-        pass # Todo: proper sound synth
+        self.sound_generator.play_random()
+
+    def add_particle(self, particle):
+        self.particles.append(particle)
 
     def handle_input(self):
         for event in pygame.event.get():
@@ -405,6 +456,7 @@ class SmashtopGame:
             self.show_settings = False
 
     def spawn_object(self, event):
+        self.play_sound()
         x = random.randint(100, self.width - 100)
         y = random.randint(100, self.height - 100)
         
