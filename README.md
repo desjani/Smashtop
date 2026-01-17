@@ -32,3 +32,11 @@ Run the application with Administrator privileges (required to block system keys
 ```bash
 python main.py
 ```
+
+## Alternate Installation (using `uv`)
+
+You can also use [uv](https://docs.astral.sh/uv/) to manage dependencies.
+
+1. Install `uv` using [their installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
+2. (optional) `uv sync`.
+3. `uv run main.py` (or `uv run python main.py` if you prefer).
