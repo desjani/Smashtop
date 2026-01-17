@@ -11,6 +11,35 @@
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Build Smashtop EXE",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-m",
+				"PyInstaller",
+				"--onefile",
+				"--noconsole",
+				"--name",
+				"Smashtop",
+				"main.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Build Smashtop EXE",
+			"type": "shell",
+			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
+			"group": "build"
+		},
+		{
+			"label": "Build Smashtop EXE",
+			"type": "shell",
+			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
+			"group": "build"
 		}
 	]
 }
