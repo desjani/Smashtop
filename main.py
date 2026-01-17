@@ -182,10 +182,25 @@ class EmojiParticle(Particle):
     def draw(self, surface):
         if not self.image: return
         # Scale image
-        curr_size = int(self.size * self.scale)
+        curr_size = self.size * self.scale
         if curr_size <= 1: return
         
-        scaled = pygame.transform.scale(self.image, (curr_size, curr_size))
+        # Preserve aspect ratio
+        w, h = self.image.get_size()
+        if w == 0 or h == 0: return
+        aspect = w / h
+        
+        # Determine dimensions based on max side to match target "size"
+        if w > h:
+            new_w = int(curr_size)
+            new_h = int(curr_size / aspect)
+        else:
+            new_h = int(curr_size)
+            new_w = int(curr_size * aspect)
+            
+        if new_w <= 0 or new_h <= 0: return
+
+        scaled = pygame.transform.scale(self.image, (new_w, new_h))
         rect = scaled.get_rect(center=(self.x, self.y))
         surface.blit(scaled, rect)
 
@@ -703,8 +718,8 @@ class EmojiRenderer:
             pil_font = ImageFont.truetype(self.font_path, size)
             # Create a larger canvas to avoid clipping. 
             # Emojis can have wild bounding boxes especially with combined glyphs (ZWJ stats)
-            # Using size * 2 ensures enough padding.
-            w, h = int(size * 2), int(size * 2)
+            # Using size * 3 ensures enough padding (increased from 2).
+            w, h = int(size * 3), int(size * 3)
             
             img = Image.new("RGBA", (w, h), (0,0,0,0))
             draw = ImageDraw.Draw(img)
