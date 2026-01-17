@@ -674,6 +674,13 @@ class SmashtopGame:
             idx = keys.index(self.bg_name)
             self.bg_name = keys[(idx + 1) % len(keys)]
             changed = True
+            
+        elif event.key == pygame.K_UP:
+             self.max_objects += 10
+             if self.max_objects > 500: self.max_objects = 500
+        elif event.key == pygame.K_DOWN:
+             self.max_objects -= 10
+             if self.max_objects < 10: self.max_objects = 10
         
         elif event.key == pygame.K_ESCAPE:
             self.show_settings = False
@@ -787,6 +794,7 @@ class SmashtopGame:
                 f"[4] Theme: Sea {'(Active)' if self.theme == 'Sea' else ''}",
                 "",
                 f"[C] Background: {self.bg_name}",
+                f"[Up/Down] Max Objects: {self.max_objects}",
                 "",
                 "[Esc] Close Menu",
                 "[Ctrl+Shift+Q] Quit Game"
