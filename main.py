@@ -495,16 +495,20 @@ class EmojiRenderer:
         
         try:
             pil_font = ImageFont.truetype(self.font_path, size)
-            # Get size
-            bbox = pil_font.getbbox(char)
-            # w = bbox[2]
-            # h = bbox[3] # This often underestimates for emojis, hardcode square usually safe
-            w, h = size + 20, size + 20
+            # Create a larger canvas to avoid clipping. 
+            # Emojis can have wild bounding boxes especially with combined glyphs (ZWJ stats)
+            # Using size * 2 ensures enough padding.
+            w, h = int(size * 2), int(size * 2)
             
             img = Image.new("RGBA", (w, h), (0,0,0,0))
             draw = ImageDraw.Draw(img)
             # Draw centered
             draw.text((w/2, h/2), char, font=pil_font, embedded_color=True, anchor="mm")
+            
+            # Crop it back down (optional, but saves texture memory)
+            bbox = img.getbbox()
+            if bbox:
+                img = img.crop(bbox)
             
             # Convert to Pygame
             raw_str = img.tobytes("raw", "RGBA")
