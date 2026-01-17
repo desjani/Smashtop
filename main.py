@@ -801,6 +801,7 @@ class SmashtopGame:
         self.theme = "Shapes" # Shapes, Fireworks, Emoji, Paint, Sea
         self.sound_enabled = True
         self.max_objects = 50
+        self.display_mode = "borderless" # "borderless" or "fullscreen"
         
         # Display setup
         self.num_displays = pygame.display.get_num_displays()
@@ -841,6 +842,7 @@ class SmashtopGame:
                     self.theme = data.get("theme", self.theme)
                     self.max_objects = data.get("max_objects", self.max_objects)
                     self.current_display_index = data.get("display_index", 0)
+                    self.display_mode = data.get("display_mode", "borderless")
                     
                     # Validate display index
                     if self.current_display_index >= self.num_displays:
@@ -855,7 +857,8 @@ class SmashtopGame:
                 "bg_name": self.bg_name,
                 "theme": self.theme,
                 "max_objects": self.max_objects,
-                "display_index": self.current_display_index
+                "display_index": self.current_display_index,
+                "display_mode": self.display_mode
             }
             with open("smashtop_settings.json", "w") as f:
                 json.dump(data, f, indent=4)
@@ -863,11 +866,16 @@ class SmashtopGame:
             print(f"Failed to save settings: {e}")
 
     def setup_display(self):
+        # Determine flags based on mode
+        flags = pygame.NOFRAME
+        if self.display_mode == "fullscreen":
+            flags |= pygame.FULLSCREEN
+
         # Use (0,0) to use the desktop resolution of the specified display
         try:
-            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME, display=self.current_display_index)
+            self.screen = pygame.display.set_mode((0, 0), flags, display=self.current_display_index)
         except Exception as e:
-            print(f"Failed to set display mode on monitor {self.current_display_index}: {e}")
+            print(f"Failed to set display mode on monitor {self.current_display_index} with mode {self.display_mode}: {e}")
             # Fallback to default
             self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME)
             
@@ -961,6 +969,15 @@ class SmashtopGame:
             
         elif event.key == pygame.K_m:
              self.current_display_index = (self.current_display_index + 1) % self.num_displays
+             self.setup_display()
+             changed = True
+
+        elif event.key == pygame.K_f:
+             # Toggle display mode
+             if self.display_mode == "borderless":
+                 self.display_mode = "fullscreen"
+             else:
+                 self.display_mode = "borderless"
              self.setup_display()
              changed = True
 
@@ -1101,6 +1118,7 @@ class SmashtopGame:
                 f"[C] Background: {self.bg_name}",
                 f"[Up/Down] Max Objects (Shapes/Emoji): {self.max_objects}",
                 f"[M] Monitor: {self.current_display_index + 1} / {self.num_displays}",
+                f"[F] Display Mode: {self.display_mode.capitalize()}",
                 "",
                 "[Esc] Close Menu",
                 "[Ctrl+Shift+Q] Quit Game"

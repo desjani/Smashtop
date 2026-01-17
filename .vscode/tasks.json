@@ -46,6 +46,12 @@
 			"type": "shell",
 			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
 			"group": "build"
+		},
+		{
+			"label": "Build Smashtop EXE",
+			"type": "shell",
+			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
+			"group": "build"
 		}
 	]
 }
