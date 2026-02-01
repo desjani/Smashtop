@@ -225,6 +225,9 @@ class FireworkParticle(Particle):
 
     def explode(self):
         self.state = "out"
+        # Play explosion sound
+        self.game.play_firework_sound()
+        
         num_particles = random.randint(30, 60)
         color = self.color if random.random() > 0.3 else None
         
@@ -489,7 +492,7 @@ class SharkParticle(Particle):
 class WhaleParticle(Particle):
     def __init__(self, x, y):
         super().__init__(x, y, (60, 70, 110)) # Dark Blue-ish
-        self.vx = random.choice([-100, -80, 80, 100])
+        self.vx = random.choice([-125, -100, 100, 125]) # Increased speed by 25% (was 80, 100)
         self.direction = 1 if self.vx > 0 else -1
         self.size = random.randint(250, 400)
         self.anim_offset = 0
@@ -614,8 +617,15 @@ class DolphinParticle(Particle):
         # y = A sin(wt) -> y' = Aw cos(wt)
         # angle ~ atan(y')
         angle = math.atan2(math.cos(self.time * 4) * 60, 40) # rough approx factor
-        # If moving left, invert angle logic
-        pitch = angle if d > 0 else -angle
+        
+        # When moving left (d=-1), we flip the X coordinates via 'd'.
+        # If dolphin is pitching UP (angle > 0) and moving Right -> Nose points Right-Up.
+        # If dolphin is pitching UP and moving Left -> Nose should point Left-Up.
+        # Drawing logic rotates model (Nose Right), then scales x by d.
+        # Rot(Up) -> Nose Right-Up.
+        # Flip X -> Nose Left-Up. 
+        # So we use the same pitch angle regardless of direction.
+        pitch = angle
         
         cos_a = math.cos(pitch)
         sin_a = math.sin(pitch)
@@ -742,11 +752,36 @@ class EmojiRenderer:
 class SoundGenerator:
     def __init__(self):
         self.sounds = []
+        self.firework_sounds = []
         try:
             pygame.mixer.set_num_channels(16) # Allow many overlapping sounds
             self.generate_scale()
+            self.generate_firework_sounds()
         except Exception as e:
             print(f"Sound init failed: {e}")
+
+    def generate_firework_sounds(self):
+        rate = 44100
+        duration = 0.5
+        
+        # Create a few variations of noise explosions
+        for _ in range(5):
+            n_samples = int(rate * duration)
+            buf = array.array('h', [0] * n_samples)
+            
+            for i in range(n_samples):
+                # White noise with random amplitude
+                value = random.randint(-15000, 15000)
+                
+                # Envelope: sharp attack, exponential decay
+                # t goes from 0 to 1
+                t = i / n_samples
+                decay = math.exp(-6.0 * t)
+                
+                buf[i] = int(value * decay)
+            
+            s = pygame.mixer.Sound(buffer=buf)
+            self.firework_sounds.append(s)
 
     def generate_scale(self):
         # Generate C major scale notes roughly
@@ -779,11 +814,19 @@ class SoundGenerator:
                 
             self.sounds.append(pygame.mixer.Sound(buffer=buf))
 
-    def play_random(self):
+    def play_random(self, volume=0.3):
         if not self.sounds: return
         try:
             s = random.choice(self.sounds)
-            s.set_volume(0.3)
+            s.set_volume(volume)
+            s.play()
+        except: pass
+
+    def play_random_firework(self, volume=0.5):
+        if not self.firework_sounds: return
+        try:
+            s = random.choice(self.firework_sounds)
+            s.set_volume(volume)
             s.play()
         except: pass
 
@@ -800,6 +843,7 @@ class SmashtopGame:
         self.bg_name = "Black"
         self.theme = "Shapes" # Shapes, Fireworks, Emoji, Paint, Sea
         self.sound_enabled = True
+        self.volume = 0.5
         self.max_objects = 50
         self.display_mode = "borderless" # "borderless" or "fullscreen"
         
@@ -843,6 +887,8 @@ class SmashtopGame:
                     self.max_objects = data.get("max_objects", self.max_objects)
                     self.current_display_index = data.get("display_index", 0)
                     self.display_mode = data.get("display_mode", "borderless")
+                    self.volume = data.get("volume", 0.5)
+                    self.sound_enabled = data.get("sound_enabled", True)
                     
                     # Validate display index
                     if self.current_display_index >= self.num_displays:
@@ -858,7 +904,9 @@ class SmashtopGame:
                 "theme": self.theme,
                 "max_objects": self.max_objects,
                 "display_index": self.current_display_index,
-                "display_mode": self.display_mode
+                "display_mode": self.display_mode,
+                "volume": self.volume,
+                "sound_enabled": self.sound_enabled
             }
             with open("smashtop_settings.json", "w") as f:
                 json.dump(data, f, indent=4)
@@ -882,6 +930,9 @@ class SmashtopGame:
         w, h = self.screen.get_size()
         self.width = w
         self.height = h
+        
+        # Lock mouse to window to prevent accidental clicking outside
+        pygame.event.set_grab(True)
 
     def setup_hooks(self):
         if not KEYBOARD_AVAILABLE:
@@ -904,7 +955,11 @@ class SmashtopGame:
 
     def play_sound(self):
         if not self.sound_enabled: return
-        self.sound_generator.play_random()
+        self.sound_generator.play_random(self.volume)
+
+    def play_firework_sound(self):
+        if not self.sound_enabled: return
+        self.sound_generator.play_random_firework(self.volume)
 
     def add_particle(self, particle):
         self.particles.append(particle)
@@ -990,6 +1045,21 @@ class SmashtopGame:
              if self.max_objects < 10: self.max_objects = 10
              self.save_settings()
         
+        elif event.key == pygame.K_RIGHT:
+             self.volume += 0.1
+             if self.volume > 1.0: self.volume = 1.0
+             self.play_sound() # Test sound
+             self.save_settings()
+        elif event.key == pygame.K_LEFT:
+             self.volume -= 0.1
+             if self.volume < 0.0: self.volume = 0.0
+             self.play_sound() # Test sound
+             self.save_settings()
+
+        elif event.key == pygame.K_s:
+             self.sound_enabled = not self.sound_enabled
+             self.save_settings()
+
         elif event.key == pygame.K_ESCAPE:
             self.show_settings = False
 
@@ -998,7 +1068,10 @@ class SmashtopGame:
             self.save_settings()
 
     def spawn_object(self, event):
-        self.play_sound()
+        # Play generic sound unless it's Fireworks mode (handled on explosion)
+        if self.theme != "Fireworks":
+            self.play_sound()
+            
         x = random.randint(100, self.width - 100)
         y = random.randint(100, self.height - 100)
         
@@ -1014,25 +1087,22 @@ class SmashtopGame:
         if self.theme == "Fireworks":
             self.particles.append(FireworkParticle(x, y, self))
         elif self.theme == "Sea":
-             # New logic: Ensure even proportion of species
-             # Species list: Bubble, Fish, Jellyfish, Shark, Whale, Dolphin
-             species = ['baby', 'fish', 'jelly', 'shark', 'whale', 'dolphin']
+             # Weighted selection for species
+             # Higher weight = more frequent spawn
+             choices = [
+                 ('baby',   30), # Bubble
+                 ('fish',   30),
+                 ('jelly',  20),
+                 ('shark',  5),
+                 ('whale',  5),
+                 ('dolphin', 5)
+             ]
              
-             # Check current population (simple count)
-             # This is a bit expensive O(N) every keypress but N is small (<50)
-             counts = {k:0 for k in species}
-             for p in self.particles:
-                 if isinstance(p, BubbleParticle): counts['baby'] += 1
-                 elif isinstance(p, FishParticle): counts['fish'] += 1
-                 elif isinstance(p, JellyfishParticle): counts['jelly'] += 1
-                 elif isinstance(p, SharkParticle): counts['shark'] += 1
-                 elif isinstance(p, WhaleParticle): counts['whale'] += 1
-                 elif isinstance(p, DolphinParticle): counts['dolphin'] += 1
-            
-             # Find least represented
-             min_count = min(counts.values())
-             candidates = [k for k, v in counts.items() if v <= min_count]
-             choice = random.choice(candidates)
+             # Extract lists for choices
+             keys = [c[0] for c in choices]
+             weights = [c[1] for c in choices]
+             
+             choice = random.choices(keys, weights=weights, k=1)[0]
 
              if choice == 'baby':
                  self.particles.append(BubbleParticle(x, self.height + 50))
@@ -1119,6 +1189,8 @@ class SmashtopGame:
                 f"[Up/Down] Max Objects (Shapes/Emoji): {self.max_objects}",
                 f"[M] Monitor: {self.current_display_index + 1} / {self.num_displays}",
                 f"[F] Display Mode: {self.display_mode.capitalize()}",
+                f"[Left/Right] Volume: {int(self.volume * 100)}%",
+                f"[S] Sound: {'On' if self.sound_enabled else 'Off'}",
                 "",
                 "[Esc] Close Menu",
                 "[Ctrl+Shift+Q] Quit Game"
