@@ -271,7 +271,8 @@ class ExplosionParticle(Particle):
 class BubbleParticle(Particle):
     def __init__(self, x, y):
         super().__init__(x, y, (200, 200, 255))
-        self.vy = random.uniform(-100, -250)
+        # Increased speed by ~25% (was -100 to -250)
+        self.vy = random.uniform(-125, -315)
         self.wobble_phase = random.uniform(0, 100)
         self.size = random.randint(10, 80) # More varied size (was 20-60)
         
@@ -279,7 +280,8 @@ class BubbleParticle(Particle):
         super().update(dt)
         self.y += self.vy * dt
         self.wobble_phase += 5 * dt
-        self.x += math.sin(self.wobble_phase) * 100 * dt
+        # Increased horizontal sway amplitude to 150 (was 100) for more motion
+        self.x += math.sin(self.wobble_phase) * 150 * dt
         
         if self.y < -50: self.alive = False
 
@@ -840,7 +842,6 @@ class SmashtopGame:
             pygame.mixer.init()
 
         # Settings Defaults
-        self.bg_name = "Black"
         self.theme = "Shapes" # Shapes, Fireworks, Emoji, Paint, Sea
         self.sound_enabled = True
         self.volume = 0.5
@@ -851,6 +852,11 @@ class SmashtopGame:
         self.num_displays = pygame.display.get_num_displays()
         self.current_display_index = 0
         
+        # Background Surfaces (cached)
+        self.bg_surface_fireworks = None
+        self.fg_surface_fireworks = None
+        self.bg_surface_sea = None
+
         # Load saved settings
         self.load_settings()
 
@@ -882,7 +888,6 @@ class SmashtopGame:
             if os.path.exists("smashtop_settings.json"):
                 with open("smashtop_settings.json", "r") as f:
                     data = json.load(f)
-                    self.bg_name = data.get("bg_name", self.bg_name)
                     self.theme = data.get("theme", self.theme)
                     self.max_objects = data.get("max_objects", self.max_objects)
                     self.current_display_index = data.get("display_index", 0)
@@ -900,7 +905,6 @@ class SmashtopGame:
     def save_settings(self):
         try:
             data = {
-                "bg_name": self.bg_name,
                 "theme": self.theme,
                 "max_objects": self.max_objects,
                 "display_index": self.current_display_index,
@@ -933,6 +937,197 @@ class SmashtopGame:
         
         # Lock mouse to window to prevent accidental clicking outside
         pygame.event.set_grab(True)
+        
+        # Regenerate backgrounds for new size
+        self.generate_backgrounds()
+
+    def generate_backgrounds(self):
+        w, h = self.width, self.height
+        
+        # --- Helper: Smooth Vertical Gradient ---
+        def create_gradient(top_col, bot_col, height):
+            # Create a 1xheight surface and fill it with gradient
+            # We'll use intermediate steps
+            grad = pygame.Surface((1, height))
+            for y in range(height):
+                t = y / height
+                r = int(top_col[0] * (1-t) + bot_col[0] * t)
+                g = int(top_col[1] * (1-t) + bot_col[1] * t)
+                b = int(top_col[2] * (1-t) + bot_col[2] * t)
+                grad.set_at((0, y), (r, g, b))
+            return grad
+
+        # --- Fireworks ---
+        # BG: Dark sky with stars
+        # High Def smooth gradient from Deep Black-Blue to slightly lighter horizon
+        grad_surf = create_gradient((2, 0, 10), (10, 10, 40), h)
+        self.bg_surface_fireworks = pygame.transform.smoothscale(grad_surf, (w, h))
+
+        # Stars (Various sizes and brightness)
+        for _ in range(300):
+            sx = random.randint(0, w)
+            sy = random.randint(0, int(h * 0.75))
+            brightness = random.randint(100, 255)
+            size = 1 if random.random() > 0.05 else 2
+            pygame.draw.circle(self.bg_surface_fireworks, (brightness, brightness, brightness), (sx, sy), size)
+
+        # Moon (Glowy)
+        mx, my = int(w * 0.8), int(h * 0.2)
+        # Glow
+        for i in range(20, 0, -1):
+            alpha = 5 + i * 2
+            glow_s = pygame.Surface((i*6, i*6), pygame.SRCALPHA)
+            pygame.draw.circle(glow_s, (200, 200, 255, 10), (i*3, i*3), i*3)
+            self.bg_surface_fireworks.blit(glow_s, (mx - i*3, my - i*3))
+        # Moon Body
+        pygame.draw.circle(self.bg_surface_fireworks, (240, 240, 255), (mx, my), 30)
+        # Craters
+        pygame.draw.circle(self.bg_surface_fireworks, (200, 200, 220), (mx - 10, my+5), 6)
+        pygame.draw.circle(self.bg_surface_fireworks, (210, 210, 230), (mx + 8, my-8), 4)
+
+        # FG: Detailed Grass hills and trees
+        self.fg_surface_fireworks = pygame.Surface((w, h), pygame.SRCALPHA)
+        
+        # Hills (Sine Wave Silhouettes)
+        # Back hill layer (darker)
+        poly_pts = [(0, h)]
+        for i in range(0, w+1, 20):
+            # Complex noise sum
+            y_off = math.sin(i * 0.005) * 50 + math.sin(i * 0.02) * 20
+            poly_pts.append((i, h - 100 - y_off))
+        poly_pts.append((w, h))
+        pygame.draw.polygon(self.fg_surface_fireworks, (5, 15, 10), poly_pts)
+        
+        # Front hill layer (slightly lighter)
+        poly_pts_2 = [(0, h)]
+        for i in range(0, w+1, 20):
+            y_off = math.sin(i * 0.003 + 2) * 40 + math.sin(i * 0.05) * 10
+            poly_pts_2.append((i, h - 50 - y_off))
+        poly_pts_2.append((w, h))
+        pygame.draw.polygon(self.fg_surface_fireworks, (10, 25, 15), poly_pts_2)
+
+        # Detailed Trees (Recursive-ish shape)
+        def draw_pine(surf, x, y, scale):
+            col = (15, 30, 20)
+            # Trunk
+            pygame.draw.rect(surf, (20, 15, 10), (x - 4*scale, y, 8*scale, 20*scale))
+            # Tiers of leaves
+            tiers = 5
+            for i in range(tiers):
+                w_tier = (50 - i*8) * scale
+                h_tier = 25 * scale
+                y_tier = y - (i * 15 * scale) - 10*scale
+                points = [
+                    (x - w_tier, y_tier + h_tier),
+                    (x, y_tier),
+                    (x + w_tier, y_tier + h_tier)
+                ]
+                pygame.draw.polygon(surf, col, points)
+                
+        # Forest flank
+        for i in range(8):
+            scale = random.uniform(1.2, 1.8)
+            draw_pine(self.fg_surface_fireworks, random.randint(20, 250), h - 40, scale)
+            
+        for i in range(8):
+            scale = random.uniform(1.2, 1.8)
+            draw_pine(self.fg_surface_fireworks, w - random.randint(20, 250), h - 40, scale)
+
+        # --- Sea ---
+        # HD Water Gradient
+        top_sea = (50, 200, 230) # Caribbean Blue top
+        mid_sea = (0, 100, 160)
+        bot_sea = (0, 10, 40)    # Deep Abyss
+        
+        # Create 2-stage gradient
+        grad1 = create_gradient(top_sea, mid_sea, int(h/2))
+        grad2 = create_gradient(mid_sea, bot_sea, h - int(h/2))
+        
+        grad_full = pygame.Surface((1, h))
+        grad_full.blit(grad1, (0,0))
+        grad_full.blit(grad2, (0, int(h/2)))
+        
+        self.bg_surface_sea = pygame.transform.smoothscale(grad_full, (w, h))
+        
+        # Light Rays (God Rays)
+        ray_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        for i in range(10):
+            x_start = random.randint(0, w)
+            width = random.randint(20, 100)
+            angle = random.uniform(-0.2, 0.2) # Radians tilt
+            
+            # Draw a long polygon ray
+            pts = [
+                (x_start, 0),
+                (x_start + width, 0),
+                (x_start + width + math.sin(angle)*h, h),
+                (x_start + math.sin(angle)*h, h)
+            ]
+            # Faint white/cyan
+            pygame.draw.polygon(ray_surf, (200, 255, 255, 15), pts)
+        self.bg_surface_sea.blit(ray_surf, (0,0))
+
+        # Sandy Floor (with noise texture)
+        sand_h = 100
+        sand_col = (210, 195, 140)
+        
+        # Draw base sand
+        pygame.draw.rect(self.bg_surface_sea, sand_col, (0, h-sand_h, w, sand_h))
+        # Use sine waves for dunes
+        poly_sand = [(0, h)]
+        for i in range(0, w+1, 10):
+            dy = math.sin(i * 0.01) * 20 + math.sin(i*0.05) * 5
+            poly_sand.append((i, h - sand_h - dy))
+        poly_sand.append((w, h))
+        pygame.draw.polygon(self.bg_surface_sea, sand_col, poly_sand)
+        
+        # Add sand noise (speckles) for texture
+        for i in range(3000):
+            sx = random.randint(0, w)
+            sy = random.randint(h - sand_h - 20, h)
+            # Simple check if inside sand area (roughly)
+            if sy > h - sand_h + math.sin(sx * 0.01) * 20: 
+                shade = random.randint(-20, 20)
+                r = max(0, min(255, sand_col[0] + shade))
+                g = max(0, min(255, sand_col[1] + shade))
+                b = max(0, min(255, sand_col[2] + shade))
+                self.bg_surface_sea.set_at((sx, sy), (r,g,b))
+        
+        # Organic Seaweed / Coral
+        def draw_seaweed(surf, x, y, tallness):
+            pts = []
+            segments = 10
+            sway = random.uniform(0, 100) # static phase
+            for i in range(segments):
+                # snake up
+                seg_y = y - (i * tallness / segments)
+                seg_x = x + math.sin(sway + i * 0.5) * 10
+                pts.append((seg_x, seg_y))
+            
+            # Widen the strand
+            pygame.draw.lines(surf, (40, 140, 60), False, pts, 4)
+
+        for i in range(15):
+            x = random.randint(0, w)
+            # Find probable floor y
+            floor_y = h - sand_h + math.sin(x * 0.01) * 20 - 20 # Offset slightly down into sand
+            if floor_y < h:
+                draw_seaweed(self.bg_surface_sea, x, h, random.randint(50, 150))
+                
+        # Rocks/Coral Clumps
+        for i in range(8):
+            cx = random.randint(50, w-50)
+            cy = h - sand_h + math.sin(cx * 0.01) * 20 + 20
+            # Draw a cluster of circles
+            for j in range(5):
+                r = random.randint(10, 30)
+                off_x = random.randint(-20, 20)
+                off_y = random.randint(-10, 10)
+                col = random.choice([(180, 100, 100), (100, 100, 120), (160, 80, 140)])
+                pygame.draw.circle(self.bg_surface_sea, col, (cx+off_x, int(cy+off_y)), r)
+
+
+
 
     def setup_hooks(self):
         if not KEYBOARD_AVAILABLE:
@@ -1015,12 +1210,7 @@ class SmashtopGame:
             self.theme = "Sea"
             changed = True
         
-        elif event.key == pygame.K_c: 
-            # Cycle colors
-            keys = list(BACKGROUND_COLORS.keys())
-            idx = keys.index(self.bg_name)
-            self.bg_name = keys[(idx + 1) % len(keys)]
-            changed = True
+        # Removed K_c (Color Cycle) as backgrounds are now theme-locked
             
         elif event.key == pygame.K_m:
              self.current_display_index = (self.current_display_index + 1) % self.num_displays
@@ -1090,12 +1280,12 @@ class SmashtopGame:
              # Weighted selection for species
              # Higher weight = more frequent spawn
              choices = [
-                 ('baby',   30), # Bubble
+                 ('baby',   50), # Bubble
                  ('fish',   30),
-                 ('jelly',  20),
-                 ('shark',  5),
-                 ('whale',  5),
-                 ('dolphin', 5)
+                 ('jelly',  7),  # Jelly
+                 ('shark',  7),  # Shark
+                 ('whale',  1),  # Whale
+                 ('dolphin', 5)  # Dolphin
              ]
              
              # Extract lists for choices
@@ -1164,13 +1354,23 @@ class SmashtopGame:
             p.update(dt)
 
     def draw(self):
-        bg = BACKGROUND_COLORS[self.bg_name]
-        self.screen.fill(bg)
+        # Draw Background based on theme
+        if self.theme == "Fireworks":
+            self.screen.blit(self.bg_surface_fireworks, (0,0))
+        elif self.theme == "Sea":
+            self.screen.blit(self.bg_surface_sea, (0,0))
+        else:
+            # Shapes / Emoji -> Dark Grey
+            self.screen.fill((40, 40, 45))
         
         # Draw particles
         for p in self.particles:
             p.draw(self.screen)
         
+        # Foreground Elements (Fireworks only)
+        if self.theme == "Fireworks":
+             self.screen.blit(self.fg_surface_fireworks, (0,0))
+
         # Overlay settings
         if self.show_settings:
             overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -1184,8 +1384,6 @@ class SmashtopGame:
                 f"[2] Theme: Fireworks {'(Active)' if self.theme == 'Fireworks' else ''}",
                 f"[3] Theme: Emoji {'(Active)' if self.theme == 'Emoji' else ''}",
                 f"[4] Theme: Sea {'(Active)' if self.theme == 'Sea' else ''}",
-                "",
-                f"[C] Background: {self.bg_name}",
                 f"[Up/Down] Max Objects (Shapes/Emoji): {self.max_objects}",
                 f"[M] Monitor: {self.current_display_index + 1} / {self.num_displays}",
                 f"[F] Display Mode: {self.display_mode.capitalize()}",
