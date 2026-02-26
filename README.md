@@ -27,11 +27,36 @@ Smashtop is a standalone Windows application designed as a toy for babies. It lo
 
 ## Running the App
 
-Run the application with Administrator privileges (required to block system keys):
+Run the application with Administrator/Root privileges (required to block system keys):
 
+### Windows
+Run as Administrator:
 ```bash
 python main.py
 ```
+
+### macOS
+Run with sudo to enable global key hooks (optional but recommended for better lockout):
+```bash
+sudo python main.py
+```
+
+## Building the Executable
+
+### Windows
+```bash
+pyinstaller Smashtop.spec
+```
+The executable will be in `dist/Smashtop.exe`.
+
+### macOS
+**Note:** You must run this command on a macOS machine to build the Mac app.
+```bash
+pyinstaller Smashtop_Mac.spec
+```
+This will create `dist/Smashtop.app`. 
+- **Distribution:** Right-click `Smashtop.app` and choose "Compress" to create a ZIP file. Send this ZIP to users.
+- **Installation:** Users just unzip and drag the app to their Applications folder. Double-click to run. No terminal required.
 
 ## Alternate Installation (using `uv`)
 

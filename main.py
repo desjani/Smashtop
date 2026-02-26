@@ -723,10 +723,18 @@ class EmojiRenderer:
     def render(self, char, size):
         if not PIL_AVAILABLE:
             # Fallback for no PIL: simple rendered text
-            f = pygame.font.SysFont("segoeuiemoji", size)
+            font_name = "segoeuiemoji" if platform.system() == "Windows" else "applecoloremoji"
+            f = pygame.font.SysFont(font_name, size)
+            if not f: # double fallback
+                 f = pygame.font.SysFont("arial", size)
             return f.render(char, True, (255,255,255))
         
         try:
+            # Check if font path is absolute and exists, if not let Pillow try to find it
+            if self.font_path and os.path.isabs(self.font_path) and not os.path.exists(self.font_path):
+                 # Path is absolute but missing, fallback
+                 self.font_path = "arial.ttf" 
+            
             pil_font = ImageFont.truetype(self.font_path, size)
             # Create a larger canvas to avoid clipping. 
             # Emojis can have wild bounding boxes especially with combined glyphs (ZWJ stats)
@@ -1133,20 +1141,25 @@ class SmashtopGame:
         if not KEYBOARD_AVAILABLE:
             return
         
-        # Block system keys on Windows
-        if platform.system() == "Windows":
-            try:
+        system = platform.system()
+        try:
+            # Block system keys on Windows
+            if system == "Windows":
                 # Block windows keys
                 keyboard.block_key('left windows')
                 keyboard.block_key('right windows')
                 keyboard.block_key('menu')
-                # We can't easily block Alt-Tab securely without low-level hooks, 
-                # but 'keyboard' does a decent job if we just swallow the events or set the app to topmost
-                # Pygame fullscreen usually captures Alt-Tab if 'exclusive' type modes are used, 
-                # but modern Windows DWM is smart. 
-                # We rely on being topmost and capturing focus.
-            except Exception as e:
-                print(f"Hook warning: {e}")
+            elif system == "Darwin": # macOS
+                # macOS usually requires Accessibility permissions for global hooks.
+                # If we are packaged as .app, the OS should prompt the user.
+                try:
+                    # Cmd+Tab, Cmd+Space are hard to block without lower level APIs,
+                    # but we can try to swallow other inputs or just rely on fullscreen.
+                    pass 
+                except:
+                    pass
+        except Exception as e:
+            print(f"Hook warning: {e}")
 
     def play_sound(self):
         if not self.sound_enabled: return
