@@ -731,7 +731,7 @@ class EmojiRenderer:
 
             try:
                 self.font_path = font_path
-            except:
+            except Exception:
                 self.font_path = None
     
     def render(self, char, size):
@@ -866,7 +866,7 @@ class SoundGenerator:
             s = random.choice(self.sounds)
             s.set_volume(volume)
             s.play()
-        except: pass
+        except Exception: pass
 
     def play_random_firework(self, volume=0.5):
         if not self.firework_sounds: return
@@ -874,7 +874,7 @@ class SoundGenerator:
             s = random.choice(self.firework_sounds)
             s.set_volume(volume)
             s.play()
-        except: pass
+        except Exception: pass
 
 class SmashtopGame:
     def __init__(self):
@@ -882,7 +882,7 @@ class SmashtopGame:
         # Init mixer with specific settings for low latency
         try:
             pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
-        except:
+        except Exception:
             try:
                 pygame.mixer.init()
             except Exception as e:
@@ -1195,7 +1195,7 @@ class SmashtopGame:
                     # Cmd+Tab, Cmd+Space are hard to block without lower level APIs,
                     # but we can try to swallow other inputs or just rely on fullscreen.
                     pass 
-                except:
+                except Exception:
                     pass
         except Exception as e:
             print(f"Hook warning: {e}")
@@ -1382,7 +1382,8 @@ class SmashtopGame:
                 char = random.choice(emojis)
 
                 self.particles.append(EmojiParticle(x, y, char, self.emoji_renderer))
-            except: pass
+            except Exception as e:
+                print(f"Error appending EmojiParticle: {e}")
         else: # Shapes
             if event.unicode and event.unicode.strip() and event.unicode.isalnum():
                 self.particles.append(TextParticle(x, y, random_color(), event.unicode.upper(), self.font_manager))
@@ -1481,7 +1482,7 @@ class SmashtopGame:
         pygame.quit()
         if KEYBOARD_AVAILABLE:
             try: keyboard.unhook_all()
-            except: pass
+            except Exception: pass
         sys.exit()
 
 if __name__ == "__main__":
