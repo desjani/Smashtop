@@ -687,19 +687,24 @@ class DolphinParticle(Particle):
 class FontManager:
     def __init__(self):
         self.fonts = {}
+        self.surfaces = {}
         # Try to find a nice system font
         self.font_name = pygame.font.get_default_font()
 
     def render(self, text, size, color):
-        key = (size)
-        if key not in self.fonts:
-            self.fonts[key] = pygame.font.Font(self.font_name, size)
+        if size not in self.fonts:
+            self.fonts[size] = pygame.font.Font(self.font_name, size)
+            
+        surf_key = (text, size, color)
+        if surf_key not in self.surfaces:
+            self.surfaces[surf_key] = self.fonts[size].render(text, True, color)
         
-        return self.fonts[key].render(text, True, color)
+        return self.surfaces[surf_key]
 
 class EmojiRenderer:
     def __init__(self):
         self.font = None
+        self.cache = {}
         if PIL_AVAILABLE:
             # Try to load a known emoji font
             # Windows: "seguiemj.ttf"
@@ -730,13 +735,19 @@ class EmojiRenderer:
                 self.font_path = None
     
     def render(self, char, size):
+        cache_key = (char, size)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+
         if not PIL_AVAILABLE:
             # Fallback for no PIL: simple rendered text
             font_name = "segoeuiemoji" if platform.system() == "Windows" else "applecoloremoji"
             f = pygame.font.SysFont(font_name, size)
             if not f: # double fallback
                  f = pygame.font.SysFont("arial", size)
-            return f.render(char, True, (255,255,255))
+            result = f.render(char, True, (255,255,255))
+            self.cache[cache_key] = result
+            return result
         
         try:
             # Check if font path is absolute and exists, if not let Pillow try to find it
@@ -774,11 +785,15 @@ class EmojiRenderer:
 
             # Convert to Pygame
             raw_str = img.tobytes("raw", "RGBA")
-            return pygame.image.fromstring(raw_str, img.size, "RGBA")
+            result = pygame.image.fromstring(raw_str, img.size, "RGBA")
+            self.cache[cache_key] = result
+            return result
         except Exception as e:
             print(f"Emoji render error: {e}")
             f = pygame.font.SysFont("arial", int(size/2))
-            return f.render(char, True, (255,255,255))
+            result = f.render(char, True, (255,255,255))
+            self.cache[cache_key] = result
+            return result
 
 class SoundGenerator:
     def __init__(self):
@@ -1387,6 +1402,11 @@ class SmashtopGame:
 
         # Filter alive
         self.particles = [p for p in self.particles if p.alive]
+        
+        # Limit objects to prevent lag (e.g., from fireworks)
+        if len(self.particles) > self.max_objects:
+            self.particles = self.particles[-self.max_objects:]
+
         for p in self.particles:
             p.update(dt)
 
