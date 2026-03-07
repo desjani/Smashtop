@@ -795,87 +795,120 @@ class EmojiRenderer:
             self.cache[cache_key] = result
             return result
 
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 class SoundGenerator:
     def __init__(self):
-        self.sounds = []
-        self.firework_sounds = []
+        self.sounds = {'notes': [], 'fireworks': [], 'bubbles': [], 'pops': []}
+        self.style = "synth" # "synth" or "asset"
         try:
-            pygame.mixer.set_num_channels(16) # Allow many overlapping sounds
-            self.generate_scale()
-            self.generate_firework_sounds()
+            pygame.mixer.set_num_channels(16)
+            self.generate_synth_sounds()
         except Exception as e:
             print(f"Sound init failed: {e}")
 
-    def generate_firework_sounds(self):
+    def generate_synth_sounds(self):
+        self.synth_sounds = {'notes': [], 'fireworks': [], 'bubbles': [], 'pops': []}
         rate = 44100
-        duration = 0.5
         
-        # Create a few variations of noise explosions
-        for _ in range(5):
-            n_samples = int(rate * duration)
-            buf = array.array('h', [0] * n_samples)
-            
-            for i in range(n_samples):
-                # White noise with random amplitude
-                value = random.randint(-15000, 15000)
-                
-                # Envelope: sharp attack, exponential decay
-                # t goes from 0 to 1
-                t = i / n_samples
-                decay = math.exp(-6.0 * t)
-                
-                buf[i] = int(value * decay)
-            
-            s = pygame.mixer.Sound(buffer=buf)
-            self.firework_sounds.append(s)
-
-    def generate_scale(self):
-        # Generate C major scale notes roughly
-        # Frequencies: C4...C6
+        # 1. Notes (Shapes)
         notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
-        rate = 44100
-        duration = 0.15 # seconds
-        
+        duration = 0.2
+        n_samples = int(rate * duration)
         for freq in notes:
-            # Generate one cycle of square wave
-            # period = rate / freq
-            # But plain array approach is easier filling the whole buffer
-            
-            n_samples = int(rate * duration)
             buf = array.array('h', [0] * n_samples)
-            
-            # Simple square wave
             period_samples = int(rate / freq)
             for i in range(n_samples):
-                # value: max volume (32767) or min (-32768)
-                # Square wave: high for half period, low for half
                 if (i % period_samples) < (period_samples // 2):
                     value = 10000 
                 else:
                     value = -10000
-                
-                # Apply simple decay envelope to avoid clicking
                 decay = 1.0 - (i / n_samples)
                 buf[i] = int(value * decay)
-                
-            self.sounds.append(pygame.mixer.Sound(buffer=buf))
+            self.synth_sounds['notes'].append(pygame.mixer.Sound(buffer=buf))
 
-    def play_random(self, volume=0.3):
-        if not self.sounds: return
+        # 2. Fireworks
+        duration = 0.5
+        for _ in range(5):
+            n_samples = int(rate * duration)
+            buf = array.array('h', [0] * n_samples)
+            for i in range(n_samples):
+                value = random.randint(-15000, 15000)
+                decay = math.exp(-6.0 * (i / n_samples))
+                buf[i] = int(value * decay)
+            self.synth_sounds['fireworks'].append(pygame.mixer.Sound(buffer=buf))
+
+        # 3. Bubbles (Sea) - fast upward sine sweep
+        duration = 0.15
+        n_samples = int(rate * duration)
+        for _ in range(4):
+            buf = array.array('h', [0] * n_samples)
+            base_freq = random.uniform(300, 500)
+            for i in range(n_samples):
+                t = i / rate
+                # freq increases over time
+                freq = base_freq + (2000 * (i/n_samples))
+                value = int(15000 * math.sin(2 * math.pi * freq * t))
+                # envelope
+                decay = math.sin(math.pi * (i / n_samples)) # smooth fade in/out
+                buf[i] = int(value * decay)
+            self.synth_sounds['bubbles'].append(pygame.mixer.Sound(buffer=buf))
+
+        # 4. Pops (Emoji) - fast downward sine sweep with sharp attack
+        duration = 0.1
+        n_samples = int(rate * duration)
+        for _ in range(4):
+            buf = array.array('h', [0] * n_samples)
+            base_freq = random.uniform(800, 1200)
+            for i in range(n_samples):
+                t = i / rate
+                freq = base_freq * math.exp(-15.0 * (i/n_samples))
+                value = int(15000 * math.sin(2 * math.pi * freq * t))
+                decay = math.exp(-10.0 * (i/n_samples))
+                buf[i] = int(value * decay)
+            self.synth_sounds['pops'].append(pygame.mixer.Sound(buffer=buf))
+
+        self.apply_style()
+
+    def set_style(self, style):
+        self.style = style
+        self.apply_style()
+
+    def apply_style(self):
+        self.sounds = {'notes': [], 'fireworks': [], 'bubbles': [], 'pops': []}
+        
+        if self.style == "asset":
+            # Try loading from assets
+            for category in self.sounds.keys():
+                path = resource_path(f"assets/sounds/{category}")
+                if os.path.exists(path):
+                    for file in os.listdir(path):
+                        if file.endswith('.wav') or file.endswith('.ogg'):
+                            try:
+                                s = pygame.mixer.Sound(os.path.join(path, file))
+                                self.sounds[category].append(s)
+                            except Exception: pass
+            
+        # Fallback to synth if assets missing or style is synth
+        for cat in self.sounds.keys():
+            if not self.sounds[cat]:
+                self.sounds[cat] = self.synth_sounds.get(cat, [])
+
+    def play(self, category, volume=0.5):
         try:
-            s = random.choice(self.sounds)
-            s.set_volume(volume)
-            s.play()
+            pool = self.sounds.get(category, [])
+            if pool:
+                s = random.choice(pool)
+                s.set_volume(volume)
+                s.play()
         except Exception: pass
-
-    def play_random_firework(self, volume=0.5):
-        if not self.firework_sounds: return
-        try:
-            s = random.choice(self.firework_sounds)
-            s.set_volume(volume)
-            s.play()
-        except Exception: pass
-
 class SmashtopGame:
     def __init__(self):
         pygame.init()
@@ -891,6 +924,7 @@ class SmashtopGame:
         # Settings Defaults
         self.theme = "Shapes" # Shapes, Fireworks, Emoji, Paint, Sea
         self.sound_enabled = True
+        self.sound_style = "synth" # "synth" or "asset"
         self.volume = 0.5
         self.max_objects = 50
         self.display_mode = "borderless" # "borderless" or "fullscreen"
@@ -918,6 +952,7 @@ class SmashtopGame:
         self.font_manager = FontManager()
         self.emoji_renderer = EmojiRenderer()
         self.sound_generator = SoundGenerator()
+        self.sound_generator.set_style(self.sound_style)
         
         # Lockout state
         self.locked = True
@@ -941,7 +976,8 @@ class SmashtopGame:
                     self.display_mode = data.get("display_mode", "borderless")
                     self.volume = data.get("volume", 0.5)
                     self.sound_enabled = data.get("sound_enabled", True)
-                    
+                    self.sound_style = data.get("sound_style", "synth")
+
                     # Validate display index
                     if self.current_display_index >= self.num_displays:
                         self.current_display_index = 0
@@ -957,7 +993,8 @@ class SmashtopGame:
                 "display_index": self.current_display_index,
                 "display_mode": self.display_mode,
                 "volume": self.volume,
-                "sound_enabled": self.sound_enabled
+                "sound_enabled": self.sound_enabled,
+                "sound_style": self.sound_style
             }
             with open("smashtop_settings.json", "w") as f:
                 json.dump(data, f, indent=4)
@@ -1202,11 +1239,19 @@ class SmashtopGame:
 
     def play_sound(self):
         if not self.sound_enabled: return
-        self.sound_generator.play_random(self.volume)
+        
+        if self.theme == "Sea":
+            self.sound_generator.play('bubbles', self.volume)
+        elif self.theme == "Emoji":
+            self.sound_generator.play('pops', self.volume)
+        elif self.theme == "Fireworks":
+            self.sound_generator.play('fireworks', self.volume * 0.5) # slightly quieter launch
+        else:
+            self.sound_generator.play('notes', self.volume)
 
     def play_firework_sound(self):
         if not self.sound_enabled: return
-        self.sound_generator.play_random_firework(self.volume)
+        self.sound_generator.play('fireworks', self.volume)
 
     def add_particle(self, particle):
         self.particles.append(particle)
@@ -1300,6 +1345,12 @@ class SmashtopGame:
 
         elif event.key == pygame.K_s:
              self.sound_enabled = not self.sound_enabled
+             self.save_settings()
+
+        elif event.key == pygame.K_a:
+             self.sound_style = "asset" if self.sound_style == "synth" else "synth"
+             self.sound_generator.set_style(self.sound_style)
+             self.play_sound() # Test sound
              self.save_settings()
 
         elif event.key == pygame.K_ESCAPE:
@@ -1447,6 +1498,7 @@ class SmashtopGame:
                 f"[F] Display Mode: {self.display_mode.capitalize()}",
                 f"[Left/Right] Volume: {int(self.volume * 100)}%",
                 f"[S] Sound: {'On' if self.sound_enabled else 'Off'}",
+                f"[A] Audio Style: {self.sound_style.capitalize()}",
                 "",
                 "[Esc] Close Menu",
                 "[Ctrl+Shift+Q] Quit Game"
