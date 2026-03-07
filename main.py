@@ -1327,7 +1327,7 @@ class SmashtopGame:
                      active_particles[0].kill()
 
         if self.theme == "Fireworks":
-            self.particles.append(FireworkParticle(x, y, self))
+            self.add_particle(FireworkParticle(x, y, self))
         elif self.theme == "Sea":
              # Weighted selection for species
              # Higher weight = more frequent spawn
@@ -1347,21 +1347,21 @@ class SmashtopGame:
              choice = random.choices(keys, weights=weights, k=1)[0]
 
              if choice == 'baby':
-                 self.particles.append(BubbleParticle(x, self.height + 50))
+                 self.add_particle(BubbleParticle(x, self.height + 50))
              elif choice == 'fish':
                  spawn_x = -50 if random.random() > 0.5 else self.width + 50
-                 self.particles.append(FishParticle(spawn_x, y, random_color()))
+                 self.add_particle(FishParticle(spawn_x, y, random_color()))
              elif choice == 'jelly':
-                 self.particles.append(JellyfishParticle(x, self.height + 50, random_color()))
+                 self.add_particle(JellyfishParticle(x, self.height + 50, random_color()))
              elif choice == 'shark':
                  spawn_x = -200 if random.random() > 0.5 else self.width + 200
-                 self.particles.append(SharkParticle(spawn_x, y))
+                 self.add_particle(SharkParticle(spawn_x, y))
              elif choice == 'whale':
                  spawn_x = -300 if random.random() > 0.5 else self.width + 300
-                 self.particles.append(WhaleParticle(spawn_x, y)) 
+                 self.add_particle(WhaleParticle(spawn_x, y)) 
              elif choice == 'dolphin':
                  spawn_x = -200 if random.random() > 0.5 else self.width + 200
-                 self.particles.append(DolphinParticle(spawn_x, y))  
+                 self.add_particle(DolphinParticle(spawn_x, y))  
 
         elif self.theme == "Emoji":
             try:
@@ -1381,15 +1381,15 @@ class SmashtopGame:
                 # Always pick a pretty emoji, ignoring the actual typed character
                 char = random.choice(emojis)
 
-                self.particles.append(EmojiParticle(x, y, char, self.emoji_renderer))
+                self.add_particle(EmojiParticle(x, y, char, self.emoji_renderer))
             except Exception as e:
                 print(f"Error appending EmojiParticle: {e}")
         else: # Shapes
             if event.unicode and event.unicode.strip() and event.unicode.isalnum():
-                self.particles.append(TextParticle(x, y, random_color(), event.unicode.upper(), self.font_manager))
+                self.add_particle(TextParticle(x, y, random_color(), event.unicode.upper(), self.font_manager))
             else:
                 shape = random.choice(['oval', 'triangle', 'square', 'pentagon', 'star'])
-                self.particles.append(ShapeParticle(x, y, random_color(), shape))
+                self.add_particle(ShapeParticle(x, y, random_color(), shape))
 
     def update(self, dt):
         # Handle repeats
@@ -1467,23 +1467,24 @@ class SmashtopGame:
         pygame.display.flip()
 
     def run(self):
-        while self.running:
-            dt = self.clock.tick(FPS) / 1000.0 # DT in seconds
-            self.handle_input()
-            self.update(dt)
-            self.draw()
-            
-            # Ensure focus
-            if platform.system() == "Windows" and not self.show_settings:
-                 # Check if we lost focus? Pygame handles this mostly by grabbing input
-                 pass
-
-        self.save_settings()
-        pygame.quit()
-        if KEYBOARD_AVAILABLE:
-            try: keyboard.unhook_all()
-            except Exception: pass
-        sys.exit()
+        try:
+            while self.running:
+                dt = self.clock.tick(FPS) / 1000.0 # DT in seconds
+                self.handle_input()
+                self.update(dt)
+                self.draw()
+                
+                # Ensure focus
+                if platform.system() == "Windows" and not self.show_settings:
+                     # Check if we lost focus? Pygame handles this mostly by grabbing input
+                     pass
+        finally:
+            self.save_settings()
+            pygame.quit()
+            if KEYBOARD_AVAILABLE:
+                try: keyboard.unhook_all()
+                except Exception: pass
+            sys.exit()
 
 if __name__ == "__main__":
     game = SmashtopGame()
