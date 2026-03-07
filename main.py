@@ -713,8 +713,17 @@ class EmojiRenderer:
             elif system == "Darwin":
                 font_path = "/System/Library/Fonts/Apple Color Emoji.ttc"
             elif system == "Linux":
-                font_path = "NotoColorEmoji.ttf" # might vary
-            
+                # Try finding a color emoji font, or use local if downloaded
+                font_paths_to_try = [
+                    "NotoColorEmoji.ttf",
+                    "/usr/share/fonts/google-noto-color-emoji-fonts/Noto-COLRv1.ttf",
+                    "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+                ]
+                for p in font_paths_to_try:
+                    if os.path.exists(p):
+                        font_path = p
+                        break
+
             try:
                 self.font_path = font_path
             except:
@@ -735,11 +744,13 @@ class EmojiRenderer:
                  # Path is absolute but missing, fallback
                  self.font_path = "arial.ttf" 
             
-            pil_font = ImageFont.truetype(self.font_path, size)
+            # CBDT/CBLC colored emoji fonts require an exact pixel size matching their internal bitmaps (often 109px)
+            # We render it at fixed resolution, then scale it down/up using Pillow.
+            base_size = 109
+            pil_font = ImageFont.truetype(self.font_path, base_size)
+            
             # Create a larger canvas to avoid clipping. 
-            # Emojis can have wild bounding boxes especially with combined glyphs (ZWJ stats)
-            # Using size * 3 ensures enough padding (increased from 2).
-            w, h = int(size * 3), int(size * 3)
+            w, h = int(base_size * 3), int(base_size * 3)
             
             img = Image.new("RGBA", (w, h), (0,0,0,0))
             draw = ImageDraw.Draw(img)
@@ -751,11 +762,21 @@ class EmojiRenderer:
             if bbox:
                 img = img.crop(bbox)
             
+            # Scale to requested size while preserving aspect ratio
+            img_w, img_h = img.size
+            if img_w > 0 and img_h > 0:
+                aspect = img_w / img_h
+                if img_w > img_h:
+                    target_w, target_h = size, int(size / aspect)
+                else:
+                    target_h, target_w = size, int(size * aspect)
+                img = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
+
             # Convert to Pygame
             raw_str = img.tobytes("raw", "RGBA")
             return pygame.image.fromstring(raw_str, img.size, "RGBA")
         except Exception as e:
-            # print(f"Emoji render error: {e}")
+            print(f"Emoji render error: {e}")
             f = pygame.font.SysFont("arial", int(size/2))
             return f.render(char, True, (255,255,255))
 
@@ -847,7 +868,10 @@ class SmashtopGame:
         try:
             pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
         except:
-            pygame.mixer.init()
+            try:
+                pygame.mixer.init()
+            except Exception as e:
+                print(f"Warning: Audio device could not be loaded: {e}. Sound will be disabled.")
 
         # Settings Defaults
         self.theme = "Shapes" # Shapes, Fireworks, Emoji, Paint, Sea
@@ -1326,8 +1350,7 @@ class SmashtopGame:
 
         elif self.theme == "Emoji":
             try:
-                char = event.unicode
-                # Expanded Emoji List
+                # Expanded Emoji List (Prettiest ones, excludes basic numbers/letters)
                 emojis = [
                     '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇',
                     '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷',
@@ -1335,13 +1358,14 @@ class SmashtopGame:
                     '🚗', '🚕', '🚙', '🚌', '🚎', '🏎', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜',
                     '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸', '🥅', '🏒',
                     '🌈', '☀️', '⭐', '🌟', '🌙', '☁️', '❄️', '🔥', '🎈', '🎁', '🎂', '🎨', '🎺',
-                    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞'
+                    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞',
+                    '🌺', '🌻', '🌼', '🌷', '🦋', '🐝', '🐞', '🍄', '🌍', '🌎', '🌏', '🪐',
+                    '🚀', '🛸', '🚁', '🚂', '🚢', '🚤', '⛵', '🛥️', '🛳️', '⛴️', '🚁', '🛩️',
+                    '🍔', '🍟', '🍕', '🌭', '🥪', '🌮', '🌯', '🥗', '🍿', '🥫', '🍱', '🍘', '🍙'
                 ]
-                if not char or not char.strip():
-                   char = random.choice(emojis)
-                # Just pick random emojis 80% of time for fun
-                if random.random() > 0.2:
-                    char = random.choice(emojis)
+                # Always pick a pretty emoji, ignoring the actual typed character
+                char = random.choice(emojis)
+
                 self.particles.append(EmojiParticle(x, y, char, self.emoji_renderer))
             except: pass
         else: # Shapes

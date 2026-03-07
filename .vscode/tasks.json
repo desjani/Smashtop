@@ -1,99 +1,49 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Run Smashtop App",
-			"type": "shell",
-			"command": "python",
-			"args": [
-				"main.py"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "python",
-			"args": [
-				"-m",
-				"PyInstaller",
-				"--onefile",
-				"--noconsole",
-				"--name",
-				"Smashtop",
-				"main.py"
-			],
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		},
-		{
-			"label": "Build Smashtop EXE",
-			"type": "shell",
-			"command": "pyinstaller Smashtop.spec --clean --noconfirm",
-			"group": "build"
-		}
-	]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Smashtop App",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "main.py"
+            ],
+            "isBackground": false,
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Build Smashtop EXE (Spec)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/pyinstaller",
+            "args": [
+                "Smashtop.spec",
+                "--clean",
+                "--noconfirm"
+            ],
+            "isBackground": false,
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "Build Smashtop EXE (Onefile)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "-m",
+                "PyInstaller",
+                "--onefile",
+                "--noconsole",
+                "--name",
+                "Smashtop",
+                "main.py"
+            ],
+            "isBackground": false,
+            "problemMatcher": [],
+            "group": "build"
+        }
+    ]
 }
