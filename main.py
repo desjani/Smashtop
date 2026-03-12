@@ -342,7 +342,7 @@ class FishParticle(Particle):
         # Pygame ellipse is axis aligned, so we can't rotate it easily without a surface
         # But a circle/oval works fine for a simple fish. 
         body_rect = pygame.Rect(0, 0, 70*self.scale, 50*self.scale)
-        body_rect.center = (x, y)
+        body_rect.center = (int(x), int(y))
         pygame.draw.ellipse(surface, self.color, body_rect)
         
         # Eye (White sclera, Black pupil)
@@ -758,7 +758,14 @@ class EmojiRenderer:
             # CBDT/CBLC colored emoji fonts require an exact pixel size matching their internal bitmaps (often 109px)
             # We render it at fixed resolution, then scale it down/up using Pillow.
             base_size = 109
-            pil_font = ImageFont.truetype(self.font_path, base_size)
+            
+            try:
+                # Type safe font path to avoid 'str | None' errors
+                fp = self.font_path if self.font_path else "arial.ttf"
+                pil_font = ImageFont.truetype(fp, base_size)
+            except Exception:
+                # Full fallback to default font and generic size
+                pil_font = ImageFont.load_default()
             
             # Create a larger canvas to avoid clipping. 
             w, h = int(base_size * 3), int(base_size * 3)
@@ -799,14 +806,15 @@ class EmojiRenderer:
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
-        base_path = sys._MEIPASS
+        base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
 class SoundGenerator:
     def __init__(self):
-        self.sounds = {'notes': [], 'fireworks': [], 'bubbles': [], 'pops': []}
+        self.sounds = {'notes': [], 'fireworks': [], 'bubbles': [], 'pops': [], 'space': [], 'animals': [], 'piano': []}
+        self.synth_sounds = {'notes': [], 'fireworks': [], 'bubbles': [], 'pops': [], 'space': [], 'animals': [], 'piano': []}
         self.style = "synth" # "synth" or "asset"
         try:
             pygame.mixer.set_num_channels(16)
@@ -1078,7 +1086,7 @@ class SmashtopGame:
         for i in range(0, w+1, 20):
             # Complex noise sum
             y_off = math.sin(i * 0.005) * 50 + math.sin(i * 0.02) * 20
-            poly_pts.append((i, h - 100 - y_off))
+            poly_pts.append((i, int(h - 100 - y_off)))
         poly_pts.append((w, h))
         pygame.draw.polygon(self.fg_surface_fireworks, (5, 15, 10), poly_pts)
         
@@ -1086,7 +1094,7 @@ class SmashtopGame:
         poly_pts_2 = [(0, h)]
         for i in range(0, w+1, 20):
             y_off = math.sin(i * 0.003 + 2) * 40 + math.sin(i * 0.05) * 10
-            poly_pts_2.append((i, h - 50 - y_off))
+            poly_pts_2.append((i, int(h - 50 - y_off)))
         poly_pts_2.append((w, h))
         pygame.draw.polygon(self.fg_surface_fireworks, (10, 25, 15), poly_pts_2)
 
@@ -1161,7 +1169,7 @@ class SmashtopGame:
         poly_sand = [(0, h)]
         for i in range(0, w+1, 10):
             dy = math.sin(i * 0.01) * 20 + math.sin(i*0.05) * 5
-            poly_sand.append((i, h - sand_h - dy))
+            poly_sand.append((i, int(h - sand_h - dy)))
         poly_sand.append((w, h))
         pygame.draw.polygon(self.bg_surface_sea, sand_col, poly_sand)
         
@@ -1170,7 +1178,7 @@ class SmashtopGame:
             sx = random.randint(0, w)
             sy = random.randint(h - sand_h - 20, h)
             # Simple check if inside sand area (roughly)
-            if sy > h - sand_h + math.sin(sx * 0.01) * 20: 
+            if sy > int(h - sand_h + math.sin(sx * 0.01) * 20): 
                 shade = random.randint(-20, 20)
                 r = max(0, min(255, sand_col[0] + shade))
                 g = max(0, min(255, sand_col[1] + shade))
@@ -1465,9 +1473,11 @@ class SmashtopGame:
     def draw(self):
         # Draw Background based on theme
         if self.theme == "Fireworks":
-            self.screen.blit(self.bg_surface_fireworks, (0,0))
+            if self.bg_surface_fireworks is not None:
+                self.screen.blit(self.bg_surface_fireworks, (0,0))
         elif self.theme == "Sea":
-            self.screen.blit(self.bg_surface_sea, (0,0))
+            if self.bg_surface_sea is not None:
+                self.screen.blit(self.bg_surface_sea, (0,0))
         else:
             # Shapes / Emoji -> Dark Grey
             self.screen.fill((40, 40, 45))
@@ -1478,7 +1488,8 @@ class SmashtopGame:
         
         # Foreground Elements (Fireworks only)
         if self.theme == "Fireworks":
-             self.screen.blit(self.fg_surface_fireworks, (0,0))
+            if self.fg_surface_fireworks is not None:
+                self.screen.blit(self.fg_surface_fireworks, (0,0))
 
         # Overlay settings
         if self.show_settings:
