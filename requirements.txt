@@ -1,0 +1,6 @@
+pytest>=7.0.0
+black>=23.0.0
+flake8>=6.0.0
+keyboard==0.13.5
+pillow==12.1.0
+pygame>=2.6.1
