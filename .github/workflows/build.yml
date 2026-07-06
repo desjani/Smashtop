@@ -1,0 +1,74 @@
+name: Build and Release Smashtop
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            spec: Smashtop.spec
+            artifact_name: Smashtop-linux
+            binary_path: dist/Smashtop
+          - os: windows-latest
+            spec: Smashtop.exe.spec
+            artifact_name: Smashtop-windows
+            binary_path: dist/Smashtop.exe
+          - os: macos-latest
+            spec: Smashtop_Mac.spec
+            artifact_name: Smashtop-macos
+            binary_path: dist/Smashtop
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller ${{ matrix.spec }}
+
+      - name: Package macOS App (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd dist
+          zip -r ../Smashtop-mac-app.zip Smashtop.app
+          cd ..
+
+      - name: Upload Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.binary_path }}
+            Smashtop-mac-app.zip
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.binary_path }}
+            Smashtop-mac-app.zip

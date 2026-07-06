@@ -24,6 +24,12 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
+
 # Constants
 WIDTH, HEIGHT = 0, 0 # Will be set on init
 FPS = 60
@@ -699,65 +705,96 @@ class FontManager:
 
 class EmojiRenderer:
     def __init__(self):
-        self.font = None
+        self.font_path = None
+        self.use_bundled = False
+        
         if PIL_AVAILABLE:
-            # Try to load a known emoji font
-            # Windows: "seguiemj.ttf"
-            # Mac: "Apple Color Emoji.ttc"
-            # Linux: "NotoColorEmoji.ttf"
-            font_path = "arial.ttf" # Fallback
-            
-            system = platform.system()
-            if system == "Windows":
-                font_path = "seguiemj.ttf"
-            elif system == "Darwin":
-                font_path = "/System/Library/Fonts/Apple Color Emoji.ttc"
-            elif system == "Linux":
-                font_path = "NotoColorEmoji.ttf" # might vary
-            
-            try:
-                self.font_path = font_path
-            except:
-                self.font_path = None
-    
+            # 1. Try bundled font first
+            bundled_path = get_resource_path("NotoColorEmoji.ttf")
+            if os.path.exists(bundled_path):
+                self.font_path = bundled_path
+                self.use_bundled = True
+            else:
+                # 2. Fallback to system fonts if bundled is not found
+                system = platform.system()
+                if system == "Windows":
+                    self.font_path = "seguiemj.ttf"
+                elif system == "Darwin":
+                    self.font_path = "/System/Library/Fonts/Apple Color Emoji.ttc"
+                elif system == "Linux":
+                    # Try to locate system emoji font dynamically
+                    import shutil
+                    import subprocess
+                    if shutil.which("fc-match"):
+                        try:
+                            res = subprocess.run(
+                                ["fc-match", "-f", "%{file}", "emoji"],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                timeout=2
+                            )
+                            if res.returncode == 0:
+                                path = res.stdout.strip()
+                                if path and os.path.exists(path):
+                                    self.font_path = path
+                        except Exception:
+                            pass
+                    if not self.font_path:
+                        # Check common paths
+                        for path in [
+                            "/usr/share/fonts/google-noto-color-emoji-fonts/Noto-COLRv1.ttf",
+                            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+                            "/usr/share/fonts/opentype/noto/NotoColorEmoji.ttf",
+                            "/usr/share/fonts/noto/NotoColorEmoji.ttf",
+                            "/usr/share/fonts/truetype/emoji/NotoColorEmoji.ttf",
+                        ]:
+                            expanded = os.path.expanduser(path)
+                            if os.path.exists(expanded):
+                                self.font_path = expanded
+                                break
+
     def render(self, char, size):
-        if not PIL_AVAILABLE:
-            # Fallback for no PIL: simple rendered text
+        if not PIL_AVAILABLE or not self.font_path:
+            # Fallback for no PIL / no font: simple rendered text
             font_name = "segoeuiemoji" if platform.system() == "Windows" else "applecoloremoji"
             f = pygame.font.SysFont(font_name, size)
             if not f: # double fallback
                  f = pygame.font.SysFont("arial", size)
-            return f.render(char, True, (255,255,255))
+            return f.render(char, True, (255, 255, 255))
         
         try:
-            # Check if font path is absolute and exists, if not let Pillow try to find it
-            if self.font_path and os.path.isabs(self.font_path) and not os.path.exists(self.font_path):
-                 # Path is absolute but missing, fallback
-                 self.font_path = "arial.ttf" 
+            # Determine size to load font at.
+            # Bundled legacy NotoColorEmoji.ttf MUST be loaded at size 109.
+            load_size = 109 if self.use_bundled else size
             
-            pil_font = ImageFont.truetype(self.font_path, size)
-            # Create a larger canvas to avoid clipping. 
-            # Emojis can have wild bounding boxes especially with combined glyphs (ZWJ stats)
-            # Using size * 3 ensures enough padding (increased from 2).
-            w, h = int(size * 3), int(size * 3)
+            pil_font = ImageFont.truetype(self.font_path, load_size)
             
-            img = Image.new("RGBA", (w, h), (0,0,0,0))
+            # Create a larger canvas to avoid clipping.
+            w, h = int(load_size * 3), int(load_size * 3)
+            img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
             # Draw centered
             draw.text((w/2, h/2), char, font=pil_font, embedded_color=True, anchor="mm")
             
-            # Crop it back down (optional, but saves texture memory)
+            # Crop it back down
             bbox = img.getbbox()
             if bbox:
                 img = img.crop(bbox)
+            
+            # If we loaded at a different size, scale to the requested size
+            if load_size != size and img.size[0] > 0 and img.size[1] > 0:
+                img = img.resize((size, size), Image.Resampling.LANCZOS)
             
             # Convert to Pygame
             raw_str = img.tobytes("raw", "RGBA")
             return pygame.image.fromstring(raw_str, img.size, "RGBA")
         except Exception as e:
-            # print(f"Emoji render error: {e}")
-            f = pygame.font.SysFont("arial", int(size/2))
-            return f.render(char, True, (255,255,255))
+            try:
+                f = pygame.font.SysFont("arial", int(size/2))
+                return f.render(char, True, (255, 255, 255))
+            except:
+                return pygame.Surface((size, size), pygame.SRCALPHA)
 
 class SoundGenerator:
     def __init__(self):
